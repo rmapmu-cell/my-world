@@ -542,13 +542,13 @@
      ===================================================== */
   @media (max-width: 640px) {
     .title {
-      padding: 40px 20px 8px;
+      padding: 20px 20px 4px;         /* 顶部空间收紧 */
       font-size: clamp(36px, 11vw, 56px);
       line-height: 1.05;
     }
     .tabs {
       max-width: calc(100% - 24px);
-      margin: 8px auto 20px;
+      margin: 4px auto 12px;          /* 缩紧 */
       padding: 4px;
     }
     .tabs button {
@@ -560,18 +560,18 @@
     .rail { display: none; }
 
     .stage {
-      height: 380px;
-      perspective: 1000px;
+      height: 460px;                  /* 加高，装下更大的卡 */
+      perspective: 1100px;
     }
     .card {
-      width: 190px;
-      height: 270px;
+      width: 220px;                   /* 放大 */
+      height: 315px;
       padding: 6px;
-      border-radius: 12px;
+      border-radius: 14px;
     }
-    .card .caption { padding: 10px 12px; }
-    .card .caption .name { font-size: 18px; }
-    .card .caption .sub  { font-size: 9px; }
+    .card .caption { padding: 12px 14px; }
+    .card .caption .name { font-size: 20px; }
+    .card .caption .sub  { font-size: 10px; }
 
     .footer-bar {
       left: 12px; right: 12px; bottom: 12px;
@@ -597,8 +597,63 @@
 
   /* 更小的屏幕（如 iPhone SE ~375px）再压一次 */
   @media (max-width: 380px) {
-    .card { width: 170px; height: 240px; }
-    .stage { height: 340px; }
+    .card { width: 195px; height: 280px; }
+    .stage { height: 420px; }
+  }
+
+  /* =====================================================
+     ✨ 点击中间卡片 → 突出放大 + 显示回忆文字
+     ===================================================== */
+  .card.zoomed {
+    z-index: 999 !important;
+    transform: translateX(0) translateZ(80px) rotateY(0deg) scale(1.18) !important;
+    box-shadow: 0 30px 80px rgba(60, 80, 110, 0.45),
+                0 0 60px rgba(255, 200, 220, 0.3);
+  }
+  /* 放大时露出的回忆文字层 */
+  .card .zoom-info {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    padding: 20px 18px;
+    background: linear-gradient(180deg,
+      rgba(20, 30, 50, 0.15) 0%,
+      rgba(20, 30, 50, 0.55) 40%,
+      rgba(20, 30, 50, 0.92) 100%);
+    color: white;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    pointer-events: none;
+    border-radius: 8px;
+  }
+  .card.zoomed .zoom-info { opacity: 1; }
+  .card.zoomed .caption   { opacity: 0; transition: opacity 0.3s; }
+  .card .zoom-info .z-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    line-height: 1.1;
+  }
+  .card .zoom-info .z-sub {
+    font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; opacity: 0.75;
+    margin-bottom: 12px;
+  }
+  .card .zoom-info .z-desc {
+    font-size: 12px;
+    line-height: 1.6;
+    opacity: 0.95;
+    max-height: 12em;
+    overflow: hidden;
+  }
+  @media (max-width: 640px) {
+    .card .zoom-info { padding: 16px 14px; }
+    .card .zoom-info .z-title { font-size: 20px; }
+    .card .zoom-info .z-desc  { font-size: 11px; max-height: 10em; }
   }
 </style>
 </head>
@@ -793,21 +848,33 @@
     card.dataset.idx = i;
     const nameEnc = encodeURIComponent(IMG_NAME[p.scene]);
     // 先试 .jpg，失败自动改试 .png，再失败就隐藏，露出下面的 CSS 场景兜底
-    const imgTag = `<img src="images/${nameEnc}.jpg"
-        onerror="if(!this.dataset.tried){this.dataset.tried='png';this.src='images/${nameEnc}.png'}else{this.style.display='none'}"
-        alt="${p.name}" />`;
     card.innerHTML = `
       <div class="art ${p.scene}">
-        ${imgTag}
+        <img src="images/${nameEnc}.jpg"
+             onerror="if(!this.dataset.tried){this.dataset.tried='png';this.src='images/${encodeURIComponent(IMG_NAME[p.scene])}.png'}else{this.style.display='none'}"
+             alt="${p.name}" />
         <div class="caption">
           <div class="name">${p.name}</div>
           <div class="sub">${p.sub}</div>
         </div>
+        <div class="zoom-info">
+          <div class="z-title">${p.name}</div>
+          <div class="z-sub">${p.sub}</div>
+          <div class="z-desc">${p.desc}</div>
+        </div>
       </div>
     `;
     card.onclick = () => {
-      if (parseInt(card.dataset.idx) === current) openModal(p);
-      else { current = parseInt(card.dataset.idx); layout(); }
+      const idx = parseInt(card.dataset.idx);
+      if (idx === current) {
+        // 已在中心 → 切换放大 / 收回
+        card.classList.toggle('zoomed');
+      } else {
+        // 点到侧边卡 → 切换到它，并清掉所有 zoom
+        clearZoom();
+        current = idx;
+        layout();
+      }
     };
     stage.appendChild(card);
   });
@@ -843,7 +910,13 @@
   layout();
   window.addEventListener('resize', layout);  // 转屏/调窗口也重新算
 
+  /* 清掉所有卡片的放大状态 */
+  function clearZoom() {
+    document.querySelectorAll('.card.zoomed').forEach(c => c.classList.remove('zoomed'));
+  }
+
   function cycle(dir) {
+    clearZoom();  // 切换卡片时收回放大
     current = (current + dir + PLACES.length) % PLACES.length;
     layout();
   }
