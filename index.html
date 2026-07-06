@@ -537,6 +537,69 @@
     border-radius: 20px;
     border: 1px solid var(--glass-border);
   }
+  /* =====================================================
+     📱 手机端适配（屏幕宽 ≤ 640px）
+     ===================================================== */
+  @media (max-width: 640px) {
+    .title {
+      padding: 40px 20px 8px;
+      font-size: clamp(36px, 11vw, 56px);
+      line-height: 1.05;
+    }
+    .tabs {
+      max-width: calc(100% - 24px);
+      margin: 8px auto 20px;
+      padding: 4px;
+    }
+    .tabs button {
+      padding: 10px 8px;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+    }
+    /* 左侧图标栏在手机端占地方，直接隐藏 */
+    .rail { display: none; }
+
+    .stage {
+      height: 380px;
+      perspective: 1000px;
+    }
+    .card {
+      width: 190px;
+      height: 270px;
+      padding: 6px;
+      border-radius: 12px;
+    }
+    .card .caption { padding: 10px 12px; }
+    .card .caption .name { font-size: 18px; }
+    .card .caption .sub  { font-size: 9px; }
+
+    .footer-bar {
+      left: 12px; right: 12px; bottom: 12px;
+      transform: none;
+      min-width: 0;
+      padding: 8px 12px;
+      gap: 10px;
+    }
+    .nav-btn { width: 38px; height: 38px; }
+    .avatar { width: 38px; height: 38px; font-size: 18px; }
+    .footer-info { min-width: 0; }
+    .footer-info .name { font-size: 18px; letter-spacing: 0.08em; }
+    .footer-info .role { font-size: 9px; letter-spacing: 0.15em; }
+
+    /* 右下角计数器藏起来，信息在底部条已经有了 */
+    .counter { display: none; }
+
+    /* 弹窗手机适配 */
+    .modal { padding: 28px 22px; }
+    .modal h2 { font-size: 28px; }
+    .modal p { font-size: 14px; }
+  }
+
+  /* 更小的屏幕（如 iPhone SE ~375px）再压一次 */
+  @media (max-width: 380px) {
+    .card { width: 170px; height: 240px; }
+    .stage { height: 340px; }
+  }
 </style>
 </head>
 <body>
@@ -752,15 +815,20 @@
   /* Coverflow */
   let current = 0;
   const cards = document.querySelectorAll('.card');
+  const isMobile = () => window.innerWidth <= 640;
 
   function layout() {
+    const mobile = isMobile();
+    const offX = mobile ? 80 : 120;   // 手机端卡片间距小一点
+    const offZ = mobile ? 90 : 120;
+    const rot  = mobile ? 18 : 22;
     cards.forEach((c, i) => {
       const offset = i - current;
       const abs = Math.abs(offset);
       const sign = Math.sign(offset);
-      const translateX = offset * 120;
-      const translateZ = -abs * 120;
-      const rotateY = -sign * Math.min(abs, 3) * 22;
+      const translateX = offset * offX;
+      const translateZ = -abs * offZ;
+      const rotateY = -sign * Math.min(abs, 3) * rot;
       const opacity = abs > 3 ? 0 : 1;
       const zIndex = 100 - abs;
       c.style.transform = `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg)`;
@@ -773,6 +841,7 @@
     document.getElementById('counter').textContent = `${current + 1} / ${PLACES.length}`;
   }
   layout();
+  window.addEventListener('resize', layout);  // 转屏/调窗口也重新算
 
   function cycle(dir) {
     current = (current + dir + PLACES.length) % PLACES.length;
@@ -784,6 +853,24 @@
     if (e.key === 'ArrowRight') cycle(1);
     if (e.key === 'Escape')     closeModal();
   });
+
+  /* 手机端左右滑动手势 */
+  const stageEl = document.getElementById('stage');
+  let touchStartX = 0, touchStartY = 0, touchStartT = 0;
+  stageEl.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartT = Date.now();
+  }, { passive: true });
+  stageEl.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const dt = Date.now() - touchStartT;
+    // 距离够远、时间不太长、横向为主 → 触发切换
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) && dt < 800) {
+      cycle(dx > 0 ? -1 : 1);
+    }
+  }, { passive: true });
 
   /* 弹窗 */
   function openModal(p) {
