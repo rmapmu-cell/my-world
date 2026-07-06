@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Choose a Destination · My World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky-top: #cfe7f5;
+    --sky-mid: #b8dcef;
+    --sky-bot: #9ec8e0;
+    --ink: #3a4a5c;
+    --glass: rgba(255,255,255,0.35);
+    --glass-border: rgba(255,255,255,0.6);
+    --serif: 'Cormorant Garamond', 'Georgia', serif;
+    --sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: var(--sans); color: var(--ink);
+    background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-bot) 100%);
+  }
+
+  /* =========== 水彩背景 =========== */
+  .backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .backdrop svg { width: 100%; height: 100%; }
+
+  /* =========== 标题 =========== */
+  .title {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 50px 20px 16px;
+    font-family: var(--serif);
+    font-size: clamp(44px, 7.5vw, 100px);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: #2f3e50;
+    text-shadow: 0 4px 30px rgba(255,255,255,0.4);
+    line-height: 1;
+  }
+
+  /* =========== Tab 导航 =========== */
+  .tabs {
+    position: relative; z-index: 3;
+    margin: 16px auto 30px;
+    display: flex;
+    max-width: 720px;
+    background: var(--glass);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 60px;
+    padding: 6px;
+    box-shadow: 0 8px 32px rgba(90,120,150,0.15);
+  }
+  .tabs button {
+    flex: 1; padding: 14px 24px;
+    background: transparent; border: none;
+    font-family: var(--serif); font-size: 20px;
+    color: var(--ink); cursor: pointer;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    letter-spacing: 0.03em;
+  }
+  .tabs button:hover { color: #1a2a3c; }
+  .tabs button.active {
+    background: rgba(255,255,255,0.75);
+    box-shadow: 0 4px 20px rgba(90,120,150,0.15);
+  }
+
+  /* =========== 左侧图标栏 =========== */
+  .rail {
+    position: fixed; left: 24px; top: 50%;
+    transform: translateY(-50%); z-index: 5;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .rail button {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    display: grid; place-items: center;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    color: var(--ink);
+  }
+  .rail button:hover { transform: scale(1.1); background: rgba(255,255,255,0.7); }
+  .rail svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+
+  /* =========== 卡片舞台 =========== */
+  .stage {
+    position: relative; z-index: 2;
+    height: 440px;
+    margin: 0 auto;
+    max-width: 1200px;
+    display: flex; align-items: center; justify-content: center;
+    perspective: 1600px;
+  }
+  .card {
+    position: absolute;
+    width: 250px; height: 360px;
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(60,80,110,0.25);
+    cursor: pointer;
+    transition: transform 0.6s cubic-bezier(0.22, 0.9, 0.3, 1.1),
+                opacity 0.6s ease;
+    transform-style: preserve-3d;
+    background: #fff; padding: 8px;
+  }
+  .card .art {
+    width: 100%; height: 100%;
+    border-radius: 8px; overflow: hidden;
+    position: relative;
+  }
+  .card .caption {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 14px 16px;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.65));
+    color: white; font-family: var(--serif);
+    z-index: 2;  /* 保证在图片之上 */
+  }
+  .card .caption .name { font-size: 22px; letter-spacing: 0.05em; }
+  .card .caption .sub  {
+    font-size: 10px; letter-spacing: 0.2em; opacity: 0.85;
+    text-transform: uppercase; margin-top: 2px;
+  }
+
+  /* =====================================================
+     真实照片层（如果 images/ 里有对应文件就显示，
+     没有就自动隐藏，露出下面的 CSS 场景插画兜底）
+     ===================================================== */
+  .art img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    display: block;
+  }
+
+  /* =====================================================
+     ↓↓↓ 16 个场景（每张卡的插画）↓↓↓
+     未来你替换成 AI 生成的图片后，可以把整块替换掉
+     ===================================================== */
+
+  /* 1. 英国 · 粉色极光 */
+  .scene-uk { background: linear-gradient(180deg, #1a1035 0%, #3a1a4a 40%, #6a2f5c 100%); }
+  .scene-uk::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(255,150,200,0.6) 0 20%, transparent 40%),
+      radial-gradient(ellipse at 65% 15%, rgba(255,120,180,0.5) 0 15%, transparent 35%),
+      radial-gradient(ellipse at 50% 25%, rgba(200,120,220,0.4) 0 30%, transparent 50%);
+    filter: blur(20px);
+  }
+  .scene-uk::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 20% 40%, #fff 0 1.5px, transparent 2.5px),
+      radial-gradient(circle at 55% 30%, #fff 0 1px, transparent 2px),
+      radial-gradient(circle at 80% 45%, #fff 0 1.5px, transparent 2.5px),
+      radial-gradient(circle at 40% 55%, #fff 0 1px, transparent 2px),
+      linear-gradient(180deg, transparent 65%, #0a0520 100%);
+  }
+
+  /* 2. 法国 · 戛纳蓝调 */
+  .scene-france { background: linear-gradient(180deg, #f4c17c 0%, #f09a75 30%, #d0648c 65%, #4a5a8c 100%); }
+  .scene-france::before {
+    content: ''; position: absolute; right: 15%; top: 20%;
+    width: 50px; height: 50px; border-radius: 50%;
+    background: radial-gradient(circle, #fff5c8 0%, #ffbb70 70%);
+    box-shadow: 0 0 60px rgba(255, 200, 120, 0.7);
+  }
+  .scene-france::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40%;
+    background:
+      linear-gradient(180deg, transparent 0%, #2a3a5c 20%, #1a2a4c 100%);
+    clip-path: polygon(0 100%, 0 40%, 15% 45%, 25% 30%, 30% 40%, 45% 25%, 55% 40%, 70% 30%, 85% 40%, 100% 35%, 100% 100%);
+  }
+
+  /* 3. 西班牙 · 高迪+海 */
+  .scene-spain { background: linear-gradient(180deg, #ffcb8a 0%, #f4a06d 40%, #ea6b5c 70%, #7fc4d8 100%); }
+  .scene-spain::before {
+    content: ''; position: absolute; left: 20%; top: 25%; width: 60%; height: 40%;
+    background:
+      repeating-linear-gradient(0deg, #d84a3a 0 8px, #f0693a 8px 14px, #f4a06d 14px 22px);
+    clip-path: polygon(20% 100%, 30% 60%, 25% 30%, 35% 20%, 40% 5%, 50% 15%, 60% 5%, 65% 20%, 75% 30%, 70% 60%, 80% 100%);
+    opacity: 0.7;
+  }
+  .scene-spain::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 30%;
+    background: linear-gradient(180deg, #3fa5c8 0%, #2b7fa8 100%);
+  }
+
+  /* 4. 德国 · 友情暖光 */
+  .scene-germany { background: linear-gradient(180deg, #6a5a7a 0%, #8a6a7c 40%, #c48a70 100%); }
+  .scene-germany::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 55%;
+    background: #2a2035;
+    clip-path: polygon(0 100%, 0 50%, 8% 45%, 8% 30%, 15% 30%, 15% 45%, 22% 45%, 22% 25%, 32% 25%, 32% 45%, 42% 45%, 42% 35%, 52% 35%, 52% 45%, 62% 45%, 62% 20%, 72% 20%, 72% 45%, 82% 45%, 82% 30%, 92% 30%, 92% 45%, 100% 45%, 100% 100%);
+  }
+  .scene-germany::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 55%;
+    background:
+      radial-gradient(circle at 5% 62%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 12% 55%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 25% 62%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 37% 62%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 47% 58%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 57% 62%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 67% 50%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 77% 62%, #ffdb8a 0 3px, transparent 4px),
+      radial-gradient(circle at 87% 55%, #ffdb8a 0 3px, transparent 4px);
+  }
+
+  /* 5. 摩洛哥 · 星空沙漠 */
+  .scene-morocco { background: linear-gradient(180deg, #1a1548 0%, #4a2a6c 40%, #a04a5c 75%, #d47a5c 100%); }
+  .scene-morocco::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 15% 20%, #fff 0 1.5px, transparent 2.5px),
+      radial-gradient(circle at 30% 30%, #fff 0 1px, transparent 2px),
+      radial-gradient(circle at 50% 15%, #fff 0 2px, transparent 3px),
+      radial-gradient(circle at 70% 25%, #fff 0 1.5px, transparent 2.5px),
+      radial-gradient(circle at 85% 10%, #fff 0 1px, transparent 2px),
+      radial-gradient(circle at 25% 55%, #fff 0 1px, transparent 2px);
+  }
+  .scene-morocco::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 45%;
+    background: linear-gradient(180deg, #c47a5c 0%, #8a4a3c 100%);
+    clip-path: polygon(0 100%, 0 40%, 15% 55%, 30% 30%, 50% 55%, 70% 35%, 85% 55%, 100% 45%, 100% 100%);
+  }
+
+  /* 6. 塞尔维亚 · 黄昏街道 */
+  .scene-serbia { background: linear-gradient(180deg, #f4c98a 0%, #d89b7c 40%, #8c5a6c 80%, #4a3a5c 100%); }
+  .scene-serbia::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 25%; height: 30%;
+    background:
+      linear-gradient(180deg, #6a4a5c 0%, #3a2a4c 100%);
+    clip-path: polygon(0 100%, 0 60%, 12% 55%, 12% 20%, 25% 20%, 25% 55%, 40% 55%, 40% 30%, 55% 30%, 55% 55%, 70% 55%, 70% 15%, 88% 15%, 88% 55%, 100% 55%, 100% 100%);
+  }
+  .scene-serbia::after {
+    /* 小狗剪影 */
+    content: ''; position: absolute; bottom: 8%; left: 30%;
+    width: 22px; height: 14px;
+    background: #1a1020;
+    border-radius: 50% 20% 50% 20% / 50% 50% 50% 50%;
+    box-shadow:
+      35px 3px 0 -2px #1a1020,   /* 第二只狗 */
+      6px -6px 0 -8px #1a1020,   /* 头 */
+      41px -3px 0 -8px #1a1020;  /* 头 */
+  }
+
+  /* 7. 黑山 · 海崖游艇 */
+  .scene-montenegro { background: linear-gradient(180deg, #7ab8d4 0%, #4a8fbc 40%, #1e5a8c 100%); }
+  .scene-montenegro::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 55%;
+    background: linear-gradient(180deg, #1e5a8c 0%, #0a2a4c 100%);
+  }
+  .scene-montenegro::after {
+    /* 游艇 */
+    content: '⛵'; position: absolute; left: 60%; bottom: 40%;
+    font-size: 22px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    /* 崖 */
+    text-shadow:
+      -140px 0 0 transparent;
+  }
+  .scene-montenegro .cliff {
+    position: absolute; left: 0; bottom: 45%; width: 45%; height: 30%;
+    background: #2a3a4c;
+    clip-path: polygon(0 100%, 0 0, 60% 20%, 85% 60%, 100% 100%);
+  }
+
+  /* 8. 日本 · 神社鸟居 */
+  .scene-japan { background: linear-gradient(180deg, #f8d4c8 0%, #f4a8a0 40%, #8a5a7c 80%, #4a3a5c 100%); }
+  .scene-japan::before {
+    /* 鸟居 */
+    content: ''; position: absolute; left: 50%; top: 30%;
+    transform: translateX(-50%);
+    width: 100px; height: 100px;
+    background:
+      linear-gradient(90deg, transparent 15%, #a02020 15% 20%, transparent 20% 80%, #a02020 80% 85%, transparent 85%),
+      linear-gradient(180deg, transparent 15%, #a02020 15% 22%, transparent 22% 35%, #a02020 35% 40%, transparent 40%);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  }
+  .scene-japan::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 35%;
+    background: linear-gradient(180deg, transparent, #2a1a2c 80%);
+    clip-path: polygon(0 100%, 0 40%, 20% 45%, 30% 25%, 45% 40%, 55% 30%, 70% 45%, 85% 30%, 100% 40%, 100% 100%);
+  }
+
+  /* 9. 越南 · 灯笼古着 */
+  .scene-vietnam { background: linear-gradient(180deg, #4a2a3c 0%, #7a3a4c 40%, #c47a5c 80%, #f4c8a0 100%); }
+  .scene-vietnam::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 20% 25%, #ffb050 0 6px, transparent 9px),
+      radial-gradient(circle at 35% 20%, #ff8040 0 8px, transparent 11px),
+      radial-gradient(circle at 55% 30%, #ffa040 0 7px, transparent 10px),
+      radial-gradient(circle at 75% 22%, #ff9040 0 6px, transparent 9px),
+      radial-gradient(circle at 90% 30%, #ff8040 0 5px, transparent 8px),
+      radial-gradient(circle at 20% 25%, rgba(255,180,80,0.4) 0 25px, transparent 30px),
+      radial-gradient(circle at 35% 20%, rgba(255,128,64,0.4) 0 30px, transparent 35px),
+      radial-gradient(circle at 55% 30%, rgba(255,160,64,0.4) 0 25px, transparent 30px);
+  }
+  .scene-vietnam::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 35%;
+    background: linear-gradient(180deg, #3a2028 0%, #1a0f18 100%);
+  }
+
+  /* 10. 香港澳门 · 霓虹 */
+  .scene-hkmacau { background: linear-gradient(180deg, #1a0f28 0%, #2a1548 50%, #4a2058 100%); }
+  .scene-hkmacau::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 25%; height: 55%;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 4px, rgba(255,80,120,0.7) 4px 5px, transparent 5px 10px),
+      repeating-linear-gradient(90deg, transparent 0 8px, rgba(120,200,255,0.5) 8px 10px, transparent 10px 20px);
+    clip-path: polygon(0 100%, 0 50%, 8% 45%, 8% 25%, 15% 25%, 15% 45%, 22% 45%, 22% 15%, 32% 15%, 32% 45%, 42% 45%, 42% 30%, 52% 30%, 52% 45%, 62% 45%, 62% 5%, 72% 5%, 72% 45%, 82% 45%, 82% 20%, 92% 20%, 92% 45%, 100% 45%, 100% 100%);
+  }
+  .scene-hkmacau::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 25%;
+    background: linear-gradient(180deg, #1a0a20 0%, #0a0410 100%);
+    box-shadow: inset 0 20px 20px rgba(255,80,120,0.15);
+  }
+
+  /* 11. 荷兰 · 阿姆运河夜 */
+  .scene-netherlands { background: linear-gradient(180deg, #2a2548 0%, #3a3560 50%, #5a4a7c 100%); }
+  .scene-netherlands::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 30%; height: 40%;
+    background: linear-gradient(180deg, #1a1530 0%, #2a1a3c 100%);
+    clip-path: polygon(0 100%, 0 60%, 6% 55%, 6% 20%, 14% 20%, 14% 55%, 22% 55%, 22% 30%, 30% 30%, 30% 55%, 38% 55%, 38% 15%, 46% 15%, 46% 55%, 54% 55%, 54% 25%, 62% 25%, 62% 55%, 70% 55%, 70% 20%, 78% 20%, 78% 55%, 86% 55%, 86% 30%, 94% 30%, 94% 55%, 100% 55%, 100% 100%);
+  }
+  .scene-netherlands::after {
+    /* 运河反光 + 窗光 */
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 20% 45%, #ffbd6a 0 2px, transparent 3px),
+      radial-gradient(circle at 45% 40%, #ffcd8a 0 2px, transparent 3px),
+      radial-gradient(circle at 70% 45%, #ffbd6a 0 2px, transparent 3px),
+      radial-gradient(circle at 85% 42%, #ffcd8a 0 2px, transparent 3px),
+      linear-gradient(180deg, transparent 70%, rgba(255,180,100,0.15) 75%, transparent 100%);
+  }
+
+  /* 12. 比利时 · 布鲁塞尔哥特 */
+  .scene-belgium { background: linear-gradient(180deg, #f4c568 0%, #d8a445 40%, #7a5a3c 80%, #3a2a1c 100%); }
+  .scene-belgium::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 20%; height: 55%;
+    background: #2a1a10;
+    clip-path: polygon(
+      0 100%, 0 60%, 5% 55%,
+      10% 30%, 15% 55%, 20% 15%, 25% 55%,
+      32% 40%, 40% 55%,
+      45% 5%, 50% 55%,
+      58% 25%, 65% 55%,
+      72% 40%, 78% 55%,
+      85% 20%, 90% 55%, 100% 50%, 100% 100%);
+  }
+  .scene-belgium::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 45% 20%, rgba(255, 220, 130, 0.4) 0 15%, transparent 40%);
+    filter: blur(6px);
+  }
+
+  /* 13. 马来西亚亚庇 · 雨天海岛 */
+  .scene-malaysia { background: linear-gradient(180deg, #a8b8c8 0%, #7aa4b0 50%, #4a7a8c 100%); }
+  .scene-malaysia::before {
+    /* 雨丝 */
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      100deg,
+      transparent 0 3px,
+      rgba(200,220,240,0.4) 3px 4px,
+      transparent 4px 8px
+    );
+    opacity: 0.7;
+  }
+  .scene-malaysia::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40%;
+    background: linear-gradient(180deg, #3a5a70 0%, #1a3a4c 100%);
+    clip-path: polygon(0 100%, 0 55%, 20% 55%, 22% 30%, 24% 55%, 45% 55%, 48% 25%, 51% 55%, 78% 55%, 82% 35%, 86% 55%, 100% 55%, 100% 100%);
+  }
+
+  /* 14. 新加坡 · 未来主义 */
+  .scene-singapore { background: linear-gradient(180deg, #3a2568 0%, #5a3a8c 40%, #7a5ab8 70%, #a884c8 100%); }
+  .scene-singapore::before {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 15%; height: 45%;
+    background:
+      linear-gradient(90deg, transparent 30%, #ffcd6a 30% 33%, transparent 33% 40%, #ffcd6a 40% 43%, transparent 43% 60%, #ffcd6a 60% 63%, transparent 63%);
+    clip-path: polygon(0 100%, 20% 55%, 32% 45%, 36% 20%, 40% 45%, 55% 55%, 60% 30%, 68% 55%, 82% 45%, 100% 60%, 100% 100%);
+  }
+  .scene-singapore::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 20%;
+    background: linear-gradient(180deg, #2a1a4c 0%, #1a0a2c 100%);
+  }
+
+  /* 15. 韩国济州 · 橘子园 */
+  .scene-jeju { background: linear-gradient(180deg, #ffdb8a 0%, #ffb060 40%, #f47a5c 75%, #a04a5c 100%); }
+  .scene-jeju::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 15% 55%, #ff8030 0 10px, transparent 12px),
+      radial-gradient(circle at 30% 65%, #ff6020 0 12px, transparent 14px),
+      radial-gradient(circle at 50% 55%, #ff8030 0 11px, transparent 13px),
+      radial-gradient(circle at 70% 70%, #ff6020 0 10px, transparent 12px),
+      radial-gradient(circle at 85% 60%, #ff8030 0 12px, transparent 14px),
+      radial-gradient(circle at 22% 78%, #ff7028 0 10px, transparent 12px),
+      radial-gradient(circle at 45% 85%, #ff5010 0 12px, transparent 14px),
+      radial-gradient(circle at 65% 82%, #ff7028 0 11px, transparent 13px),
+      radial-gradient(circle at 85% 88%, #ff5010 0 10px, transparent 12px);
+  }
+  .scene-jeju::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 20%;
+    background: linear-gradient(180deg, #4a6a2c 0%, #2a4a1c 100%);
+  }
+
+  /* 16. 俄罗斯 Askold 岛 · 无人岛 */
+  .scene-russia { background: linear-gradient(180deg, #b8c4c8 0%, #8ab0b8 40%, #5c8090 100%); }
+  .scene-russia::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 30%; height: 30%;
+    background: rgba(255,255,255,0.3);
+    filter: blur(15px);
+  }
+  .scene-russia::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 55%;
+    background:
+      linear-gradient(180deg, #4a6a5c 0%, #2a4a3c 60%, #1a3028 100%);
+    clip-path: polygon(0 100%, 0 45%, 8% 40%, 12% 25%, 14% 45%, 22% 45%, 26% 20%, 30% 45%, 38% 45%, 42% 15%, 46% 45%, 54% 45%, 60% 30%, 66% 45%, 74% 45%, 80% 25%, 84% 45%, 92% 45%, 96% 35%, 100% 45%, 100% 100%);
+  }
+
+  /* =========== 底部艺术家条 =========== */
+  .footer-bar {
+    position: fixed; left: 50%; bottom: 24px;
+    transform: translateX(-50%); z-index: 5;
+    display: flex; align-items: center; gap: 20px;
+    padding: 12px 20px;
+    background: var(--glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 100px;
+    box-shadow: 0 8px 32px rgba(90,120,150,0.15);
+    min-width: 400px;
+  }
+  .nav-btn {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255,255,255,0.5);
+    border: none; cursor: pointer;
+    display: grid; place-items: center;
+    color: var(--ink);
+    transition: all 0.2s;
+  }
+  .nav-btn:hover { background: white; transform: scale(1.08); }
+  .nav-btn svg { width: 16px; height: 16px; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, #f4c6a4, #d8a48a);
+    display: grid; place-items: center;
+    font-size: 22px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .footer-info { flex: 1; text-align: left; min-width: 160px; }
+  .footer-info .name {
+    font-family: var(--serif);
+    font-size: 22px;
+    letter-spacing: 0.15em;
+    line-height: 1;
+  }
+  .footer-info .role {
+    font-size: 11px; letter-spacing: 0.25em;
+    opacity: 0.6; margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  /* =========== 弹窗 =========== */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(30,50,80,0.5);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center; justify-content: center;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: white; border-radius: 20px;
+    padding: 40px; max-width: 480px; width: 90%;
+    box-shadow: 0 30px 80px rgba(30,50,80,0.3);
+    animation: pop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+  }
+  @keyframes pop {
+    from { transform: scale(0.85) translateY(20px); opacity: 0; }
+    to   { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  .modal h2 {
+    font-family: var(--serif);
+    font-size: 36px; font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .modal .country {
+    font-size: 12px; letter-spacing: 0.25em;
+    text-transform: uppercase;
+    opacity: 0.55; margin: 4px 0 20px;
+  }
+  .modal p { line-height: 1.75; margin-bottom: 14px; font-size: 15px; }
+  .modal .tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 20px; }
+  .tag {
+    background: #f4f0eb;
+    padding: 6px 14px; border-radius: 100px;
+    font-size: 12px; letter-spacing: 0.05em;
+  }
+  .modal button.close {
+    background: var(--ink); color: white; border: none;
+    padding: 12px 28px; border-radius: 100px;
+    font-family: var(--serif); font-size: 15px;
+    letter-spacing: 0.1em; cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .modal button.close:hover { transform: translateY(-2px); }
+
+  /* 页面右下角的小提示 */
+  .counter {
+    position: fixed; right: 24px; bottom: 24px;
+    z-index: 5;
+    font-family: var(--serif);
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    color: var(--ink);
+    opacity: 0.6;
+    background: var(--glass);
+    backdrop-filter: blur(10px);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+  }
+</style>
+</head>
+<body>
+
+<!-- 背景水彩 -->
+<div class="backdrop">
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <filter id="watercolor" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" seed="4"/>
+        <feDisplacementMap in="SourceGraphic" scale="18"/>
+      </filter>
+      <filter id="watercolor-soft" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="7"/>
+        <feDisplacementMap in="SourceGraphic" scale="10"/>
+      </filter>
+    </defs>
+    <g filter="url(#watercolor)" opacity="0.85">
+      <ellipse cx="200"  cy="150" rx="180" ry="35" fill="white"/>
+      <ellipse cx="500"  cy="220" rx="220" ry="45" fill="white"/>
+      <ellipse cx="900"  cy="130" rx="260" ry="40" fill="white"/>
+      <ellipse cx="1300" cy="200" rx="200" ry="35" fill="white"/>
+      <ellipse cx="1550" cy="320" rx="180" ry="40" fill="white"/>
+      <ellipse cx="150"  cy="380" rx="220" ry="30" fill="white"/>
+      <ellipse cx="800"  cy="360" rx="180" ry="28" fill="white"/>
+    </g>
+    <g filter="url(#watercolor-soft)" opacity="0.6">
+      <ellipse cx="350"  cy="100" rx="140" ry="25" fill="white"/>
+      <ellipse cx="1100" cy="280" rx="180" ry="30" fill="white"/>
+      <ellipse cx="600"  cy="450" rx="200" ry="25" fill="white"/>
+      <ellipse cx="1450" cy="440" rx="160" ry="25" fill="white"/>
+    </g>
+    <g filter="url(#watercolor-soft)">
+      <path d="M 0,720 L 200,600 L 380,660 L 560,580 L 780,640 L 980,590 L 1200,650 L 1400,600 L 1600,660 L 1600,900 L 0,900 Z" fill="#a8c4d8" opacity="0.75"/>
+      <path d="M 0,780 L 180,700 L 360,750 L 540,690 L 720,740 L 940,680 L 1160,730 L 1360,700 L 1600,750 L 1600,900 L 0,900 Z" fill="#7fa4c0" opacity="0.85"/>
+      <path d="M 0,850 L 240,790 L 480,830 L 720,780 L 960,820 L 1200,790 L 1440,820 L 1600,800 L 1600,900 L 0,900 Z" fill="#5b7d99" opacity="0.9"/>
+    </g>
+  </svg>
+</div>
+
+<!-- 标题 -->
+<h1 class="title">Choose a Destination</h1>
+
+<!-- Tab -->
+<nav class="tabs">
+  <button>About Me</button>
+  <button>Home</button>
+  <button class="active">Virtual Space</button>
+</nav>
+
+<!-- 左侧图标 -->
+<div class="rail">
+  <button title="收藏"><svg viewBox="0 0 24 24"><path d="M6 4h12v18l-6-4-6 4z"/></svg></button>
+  <button title="喜欢"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8-2.5 4.5-9.5 9-9.5 9z"/></svg></button>
+  <button title="账号"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></button>
+</div>
+
+<!-- 卡片舞台 -->
+<div class="stage" id="stage"></div>
+
+<!-- 底部条 -->
+<div class="footer-bar">
+  <button class="nav-btn" onclick="cycle(-1)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <div class="avatar" id="currentEmoji">✨</div>
+  <div class="footer-info">
+    <div class="name" id="currentName">—</div>
+    <div class="role" id="currentRole">—</div>
+  </div>
+  <button class="nav-btn" onclick="cycle(1)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+</div>
+
+<!-- 计数器 -->
+<div class="counter"><span id="counter">1 / 16</span></div>
+
+<!-- 弹窗 -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h2 id="mTitle"></h2>
+    <div class="country" id="mCountry"></div>
+    <p id="mDesc"></p>
+    <div class="tags" id="mTags"></div>
+    <button class="close" onclick="closeModal()">CLOSE</button>
+  </div>
+</div>
+
+<script>
+  /* ============================================================
+     你的 16 个目的地 —— 想改文字直接改这里
+     ============================================================ */
+  const PLACES = [
+    { scene: 'scene-uk',          emoji: '💗', name: 'UK',           sub: 'England · 粉色极光',
+      role: 'PINK AURORA',
+      desc: '英国的夜空亮起粉色的极光——那种粉不是可爱的粉，是宇宙不小心打翻了颜料。抬头看着的那一刻，觉得整个星球都在偷偷发光。',
+      tags: ['🌌 粉色极光', '🌠 追光之夜'] },
+
+    { scene: 'scene-france',      emoji: '🎬', name: 'FRANCE',       sub: 'Marseille · Cannes',
+      role: 'FILM FESTIVAL',
+      desc: '马赛的老港口气味咸咸的。戛纳电影节的红毯边缘，海风把裙摆吹得像电影里那样。看到明星的那一秒，反倒觉得海更好看。',
+      tags: ['🎬 戛纳电影节', '⚓ 马赛港', '🌊 蓝色海岸'] },
+
+    { scene: 'scene-spain',       emoji: '🏛️', name: 'SPAIN',        sub: 'Barcelona · Mallorca',
+      role: 'GAUDI & SEA',
+      desc: '巴塞罗那高迪的圣家堂，光透过彩色玻璃洒在地上像溶化的糖。马略卡岛的海是明信片才有的绿松石色。',
+      tags: ['🏛️ 圣家堂', '🌴 马略卡岛', '💚 松石色海'] },
+
+    { scene: 'scene-germany',     emoji: '🍻', name: 'GERMANY',      sub: 'Berlin · Hamburg',
+      role: 'GOOD FRIENDS',
+      desc: '在柏林和汉堡见了好朋友。窗外冷冷的，屋里暖黄的灯亮着，桌上是刚开的酒。这种时刻是旅行给的礼物。',
+      tags: ['🍻 见好朋友', '🏙️ 柏林墙', '⚓ 汉堡港'] },
+
+    { scene: 'scene-morocco',     emoji: '🐫', name: 'MOROCCO',      sub: 'Sahara Desert',
+      role: 'STARLIT DESERT',
+      desc: '超级好玩！骑着骆驼一步一步走进撒哈拉，晚上躺在沙上看流星雨——是那种一颗接一颗掉下来的雨，多到许愿都来不及。',
+      tags: ['🐫 骑骆驼', '⭐ 流星雨', '🏜️ 沙漠夜宿'] },
+
+    { scene: 'scene-serbia',      emoji: '🐕', name: 'SERBIA',       sub: 'Belgrade · 街角',
+      role: 'STRAY DOG TALKS',
+      desc: '和流浪狗狗对话的国家。它们不怕人，会挨着你坐下，看着你的眼睛。语言不通反而听得懂彼此。',
+      tags: ['🐕 流浪狗朋友', '🏘️ 老城巷', '☕ 街角咖啡'] },
+
+    { scene: 'scene-montenegro',  emoji: '⛵', name: 'MONTENEGRO',   sub: 'Adriatic · 海崖',
+      role: 'YACHT & CLIFF',
+      desc: '开着游艇沿海岸，钻进海崖里的黑洞，回声很深。还打了枪。海是那种蓝到怀疑真假的蓝。',
+      tags: ['⛵ 游艇日', '🕳️ 蓝洞黑洞', '🎯 打靶'] },
+
+    { scene: 'scene-japan',       emoji: '⛩️', name: 'JAPAN',        sub: 'Torii · 神社',
+      role: 'SHRINE',
+      desc: '穿过一座又一座朱红的鸟居，声音变得很轻。风摇动挂着的木牌，木牌上是别人的心愿，我借它们许愿。',
+      tags: ['⛩️ 鸟居', '🍵 神社茶', '🎋 御守'] },
+
+    { scene: 'scene-vietnam',     emoji: '👗', name: 'VIETNAM',      sub: 'Hanoi · 古着',
+      role: 'VINTAGE HUNT',
+      desc: '越南的古着店藏在小巷深处，衣服堆到天花板。买回来一件外套，还带着旧年代咖啡馆的味道。',
+      tags: ['👗 古着淘', '🏮 老巷灯笼', '🥖 越南三明治'] },
+
+    { scene: 'scene-hkmacau',     emoji: '🌆', name: 'HK · MACAU',   sub: '香港 · 澳门',
+      role: 'NEON NIGHTS',
+      desc: '香港的霓虹在下雨的地上重新亮一次。澳门的赌场里时间不存在，走出来才发现天亮了。',
+      tags: ['🌆 霓虹', '🎰 澳门夜', '🥟 街边云吞'] },
+
+    { scene: 'scene-netherlands', emoji: '🚲', name: 'NETHERLANDS',  sub: 'Amsterdam · 运河',
+      role: 'CANAL LIGHTS',
+      desc: '阿姆的运河晚上是软的，两岸窗户亮着橘色的光。红灯区其实是最老的街区，砖墙比一切故事都久。',
+      tags: ['🚲 骑车', '💡 红灯区', '🌉 运河夜'] },
+
+    { scene: 'scene-belgium',     emoji: '🏛️', name: 'BELGIUM',      sub: 'Brussels · EU',
+      role: 'EU MEETING',
+      desc: '参加了欧盟会议，坐在那种圆形会议室里，感觉自己在一部严肃的电影里。走出来又变回一个正常游客，吃了三块巧克力。',
+      tags: ['🇪🇺 欧盟会议', '🍫 巧克力', '🏛️ 大广场'] },
+
+    { scene: 'scene-malaysia',    emoji: '☔', name: 'MALAYSIA',     sub: 'Kota Kinabalu',
+      role: 'RAINY ISLAND',
+      desc: '亚庇下着雨的海岛，天灰灰的，海也灰灰的。就在这样的天气里坐在窗边喝椰奶咖啡，反而比晴天更浪漫。',
+      tags: ['☔ 雨中岛', '🥥 椰奶咖啡', '🌴 沙巴'] },
+
+    { scene: 'scene-singapore',   emoji: '🌺', name: 'SINGAPORE',    sub: '狮城 · 夜',
+      role: 'GARDEN CITY',
+      desc: '新加坡的夜晚整齐得像被熨过。滨海湾的树发光，风也是甜的。',
+      tags: ['🌺 滨海湾', '🌳 超级树', '🍜 海南鸡饭'] },
+
+    { scene: 'scene-jeju',        emoji: '🍊', name: 'JEJU',         sub: 'Korea · 橘子牛岛',
+      role: 'ORANGE ISLAND',
+      desc: '济州岛的橘子长在树上像小灯泡。牛岛骑电动车环岛一圈，风把头发吹得乱七八糟，笑得很开。',
+      tags: ['🍊 橘子园', '🐄 牛岛环岛', '🌊 海女'] },
+
+    { scene: 'scene-russia',      emoji: '🌲', name: 'ASKOLD',       sub: 'Russia · 无人岛',
+      role: 'DESERTED ISLAND',
+      desc: 'Askold 岛，一整个无人的岛。徒步到最远的海角，只有风和石头和我。海是冷灰色的，安静得像世界忘记了这里。',
+      tags: ['🌲 无人岛徒步', '🌊 海角', '🥾 野径'] },
+  ];
+
+  /* 场景名 → 中文图片文件名（不含扩展名，会自动尝试 .jpg 和 .png） */
+  const IMG_NAME = {
+    'scene-uk': '英国',        'scene-france': '法国',       'scene-spain': '西班牙',
+    'scene-germany': '德国',   'scene-morocco': '摩洛哥',    'scene-serbia': '塞尔维亚',
+    'scene-montenegro': '黑山', 'scene-japan': '日本',       'scene-vietnam': '越南',
+    'scene-hkmacau': '港澳',   'scene-netherlands': '荷兰',  'scene-belgium': '比利时',
+    'scene-malaysia': '马来西亚','scene-singapore': '新加坡','scene-jeju': '济州岛',
+    'scene-russia': '俄罗斯',
+  };
+
+  /* 生成卡片 */
+  const stage = document.getElementById('stage');
+  PLACES.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.idx = i;
+    const nameEnc = encodeURIComponent(IMG_NAME[p.scene]);
+    // 先试 .jpg，失败自动改试 .png，再失败就隐藏，露出下面的 CSS 场景兜底
+    const imgTag = `<img src="images/${nameEnc}.jpg"
+        onerror="if(!this.dataset.tried){this.dataset.tried='png';this.src='images/${nameEnc}.png'}else{this.style.display='none'}"
+        alt="${p.name}" />`;
+    card.innerHTML = `
+      <div class="art ${p.scene}">
+        ${imgTag}
+        <div class="caption">
+          <div class="name">${p.name}</div>
+          <div class="sub">${p.sub}</div>
+        </div>
+      </div>
+    `;
+    card.onclick = () => {
+      if (parseInt(card.dataset.idx) === current) openModal(p);
+      else { current = parseInt(card.dataset.idx); layout(); }
+    };
+    stage.appendChild(card);
+  });
+
+  /* Coverflow */
+  let current = 0;
+  const cards = document.querySelectorAll('.card');
+
+  function layout() {
+    cards.forEach((c, i) => {
+      const offset = i - current;
+      const abs = Math.abs(offset);
+      const sign = Math.sign(offset);
+      const translateX = offset * 120;
+      const translateZ = -abs * 120;
+      const rotateY = -sign * Math.min(abs, 3) * 22;
+      const opacity = abs > 3 ? 0 : 1;
+      const zIndex = 100 - abs;
+      c.style.transform = `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg)`;
+      c.style.opacity = opacity;
+      c.style.zIndex = zIndex;
+    });
+    document.getElementById('currentName').textContent = PLACES[current].name;
+    document.getElementById('currentRole').textContent = PLACES[current].role;
+    document.getElementById('currentEmoji').textContent = PLACES[current].emoji;
+    document.getElementById('counter').textContent = `${current + 1} / ${PLACES.length}`;
+  }
+  layout();
+
+  function cycle(dir) {
+    current = (current + dir + PLACES.length) % PLACES.length;
+    layout();
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft')  cycle(-1);
+    if (e.key === 'ArrowRight') cycle(1);
+    if (e.key === 'Escape')     closeModal();
+  });
+
+  /* 弹窗 */
+  function openModal(p) {
+    document.getElementById('mTitle').textContent = p.name;
+    document.getElementById('mCountry').textContent = p.sub;
+    document.getElementById('mDesc').textContent = p.desc;
+    document.getElementById('mTags').innerHTML = p.tags.map(t => `<span class="tag">${t}</span>`).join('');
+    document.getElementById('modal').classList.add('open');
+  }
+  function closeModal() { document.getElementById('modal').classList.remove('open'); }
+  document.getElementById('modal').onclick = e => {
+    if (e.target.id === 'modal') closeModal();
+  };
+</script>
+</body>
+</html>
